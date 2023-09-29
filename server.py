@@ -96,7 +96,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         else:
              # Handle other requests and return a 404 error
              print("405 ERROR: Method request is not supported") 
-             self.request.sendall(b"HTTP/1.1 405 Method not allowed \r\n\r\n")
+             self.request.sendall(b"HTTP/1.1 405 Method Not Allowed \r\n\r\n")
         
         
     
