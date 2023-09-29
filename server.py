@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-
+import os 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,12 +28,69 @@ import socketserver
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+
+    def handle_file(self, file_path):
+            # Handles a single file request. Returns either 200 or 404 
+            if os.path.isfile(file_path):
+                content = open(file_path, 'rb').read()
+                content_type = 'text/' + file_path.split('.')[-1]
+                response = f"HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\n\r\n".encode("utf-8") + content
+                print("200 OK at Path %s\n" % file_path)
+                self.request.sendall(response)  
+            else:
+                print("404 ERROR: File not Found at %s\n" % file_path) 
+                self.request.sendall(f"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n filepath {file_path} does not exist".encode("utf-8"))
+                
+                
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
-
+        print ("Got a request of: %s" % self.data)
+         
+        req = self.data.decode('utf-8') 
+        req_lines = req.split('\r\n') 
+        req_method= req_lines[0].split()[0]
+        req_path = req_lines[0].split()[1]
+        
+        if req_method == 'GET':
+            # Check if the directory exists otherwise, send it 
+            
+            if req_path == "/": req_path = "/index.html"
+            file_path = "www"+req_path
+            
+            # Security handling, the request MUST be in the current working directory 
+            if not os.path.realpath(file_path).startswith(os.getcwd()):
+                self.request.sendall(f"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n filepath {file_path} does not exist".encode("utf-8"))
+                print ("Error 404: Unauthorized Access for Path  %s\n" % file_path)
+                
+            elif os.path.isfile(file_path): 
+                content = open(file_path, 'rb').read()
+                content_type = 'text/' + file_path.split('.')[-1]
+                response = f"HTTP/1.1 200 OK \r\nContent-Type:{content_type}\r\n\r\n".encode("utf-8") + content
+                print("200 OK at Path %s\n" % file_path)
+                self.request.sendall(response) 
+            elif not req_path.endswith("/"):
+                redirect_url = "http://127.0.0.1:8080" + f"{req_path}" + "/"          
+                response = f"HTTP/1.1 301 Permanent Redirect\r\nLocation:{redirect_url}\r\n\r\n".encode("utf-8")
+                print("301 REDIRECT to Path %s\n" % file_path) 
+                self.request.sendall(response)
+                
+                file_path += "/index.html"
+                self.handle_file(file_path)
+            elif os.path.isdir(file_path):
+                file_path +="index.html"
+            
+                self.handle_file(file_path)
+            else:
+                print("404 ERROR: File not Found at %s\n" % file_path) 
+                self.request.sendall(f"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n filepath {file_path} does not exist".encode("utf-8"))
+            
+        else:
+             # Handle other requests or return a 404 error
+             print("405 ERROR: Method request is not supported") 
+             self.request.sendall(b"HTTP/1.1 405 Method not allowed \r\n\r\n")
+        
+        
+    
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
 
